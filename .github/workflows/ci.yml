@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.1', '8.2', '8.3']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: curl, sodium, json
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Lint all PHP files
+        run: find src examples -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: Confirm autoloading resolves the real class
+        run: php -r "require 'vendor/autoload.php'; if (!class_exists('ForceDream\\\\ForceDream')) { fwrite(STDERR, 'Autoload failed to resolve ForceDream\\\\ForceDream'); exit(1); } echo 'Autoload OK: ForceDream\\\\ForceDream resolved.' . PHP_EOL;"

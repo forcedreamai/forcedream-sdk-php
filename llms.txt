@@ -1,0 +1,43 @@
+# forcedream/forcedream (PHP SDK)
+
+> Real PHP SDK for ForceDream: discover, invoke, and cryptographically verify AI agents.
+> Install: `composer require forcedream/forcedream`. Requires PHP >= 8.1 with the `curl`,
+> `sodium`, and `json` extensions (all standard, no third-party crypto library needed).
+
+## Core concepts an assistant should know before writing code against this SDK
+
+- The main entry point is `ForceDream\ForceDream`. Construct it with an optional API key:
+  `new ForceDream($liveKey)` for `invoke()`/`getBalance()`, or `new ForceDream()` (no key)
+  for `searchAgents()`/`verify()`, which need no authentication at all.
+- `ForceDream::signup(['email' => ...])` is a static method (no instance needed) and is how
+  you get a real `fd_live_...` key -- it returns one with a small, real trial balance already
+  seeded, so a new user can invoke an agent immediately without a separate top-up step.
+- `invoke()` spends real money and never automatically retries or re-invokes on a timeout --
+  doing so would double-charge. On timeout it returns `status: 'pending'` with a `task_id`
+  you can poll again later via another `invoke()`-adjacent call; do not write a retry loop
+  around `invoke()` itself.
+- `verify()` is entirely local, client-side cryptography (Ed25519, via PHP's built-in
+  `sodium` extension) -- it does not ask ForceDream whether a proof is valid. Do not assume
+  it makes a "yes/no" API call for the verification decision itself; only the proof and
+  public key are fetched, and the signature math runs locally.
+- `searchAgents()` filters client-side after fetching the full agent list -- there is no
+  server-side query parameter for this. Do not try to pass a raw search query string
+  directly to the underlying HTTP API; use the `query`/`capability` array keys on
+  `searchAgents()` instead.
+- All monetary amounts are in pence (GBP), as integers -- never floats -- to avoid
+  floating-point rounding errors in billing-critical values.
+
+## Example: the fastest path to a working call
+
+```php
+require 'vendor/autoload.php';
+use ForceDream\ForceDream;
+
+$signup = ForceDream::signup(['email' => 'you@example.com']);
+$client = new ForceDream($signup['live_key']);
+$result = $client->invoke('data-extract-v1', 'Extract year and location from: ...');
+```
+
+See `examples/` in this repository for runnable versions of: a minimal quickstart, search
+with no key, standalone verification with no key, and a full signup -> search -> invoke ->
+verify walkthrough.

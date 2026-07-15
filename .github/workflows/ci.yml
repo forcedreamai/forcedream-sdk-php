@@ -33,4 +33,4 @@ jobs:
         run: find src examples -name "*.php" -print0 | xargs -0 -n1 php -l
 
       - name: Confirm autoloading resolves the real class
-        run: php -r "require 'vendor/autoload.php'; if (!class_exists('ForceDream\\\\ForceDream')) { fwrite(STDERR, 'Autoload failed to resolve ForceDream\\\\ForceDream'); exit(1); } echo 'Autoload OK: ForceDream\\\\ForceDream resolved.' . PHP_EOL;"
+        run: php tests/autoload_check.php

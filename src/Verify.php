@@ -101,13 +101,46 @@ final class Verify
             throw new \RuntimeException('verifyProof: hex2bin failed on digest');
         }
 
+        // Real fix: previously only ever attempted verification for algorithm ==
+        // 'Ed25519' (or null). Any real Ed25519-batched proof (Merkle-root signing,
+        // used to amortize signing cost across a settlement batch) fell through
+        // with verified left false -- a hard "signature verification FAILED" for
+        // a proof that was never actually checked. Confirmed against two real,
+        // live, settled proofs before this fix was trusted: both use
+        // Ed25519-batched and both now correctly verify true.
+        $algorithm = $proof['algorithm'] ?? 'Ed25519';
+        $isBatched = $algorithm === 'Ed25519-batched';
         $verified = false;
-        $algorithm = $proof['algorithm'] ?? null;
-        if (!empty($proof['signature']) && ($algorithm === 'Ed25519' || $algorithm === null)) {
+
+        if (!empty($proof['signature']) && ($algorithm === 'Ed25519' || $isBatched)) {
             try {
-                $sigBytes = base64_decode((string) $proof['signature'], true);
-                if ($sigBytes !== false) {
-                    $verified = sodium_crypto_sign_verify_detached($sigBytes, $digestBytes, $pubKeyBytes);
+                $checkHex = $digestHex;
+                $ok = true;
+                if ($isBatched) {
+                    $root = $proof['merkle_root'] ?? '';
+                    $siblings = $proof['inclusion_proof']['siblings'] ?? null;
+                    if ($root === '' || $siblings === null) {
+                        $ok = false;
+                    } else {
+                        $current = $digestHex;
+                        foreach ($siblings as $step) {
+                            $current = ($step['position'] === 'right')
+                                ? Canonical::sha256hex($current . $step['hash'])
+                                : Canonical::sha256hex($step['hash'] . $current);
+                        }
+                        if ($current !== $root) {
+                            $ok = false;
+                        } else {
+                            $checkHex = $current;
+                        }
+                    }
+                }
+                if ($ok) {
+                    $checkBytes = hex2bin($checkHex);
+                    $sigBytes = base64_decode((string) $proof['signature'], true);
+                    if ($checkBytes !== false && $sigBytes !== false) {
+                        $verified = sodium_crypto_sign_verify_detached($sigBytes, $checkBytes, $pubKeyBytes);
+                    }
                 }
             } catch (\Throwable $e) {
                 $verified = false;
@@ -118,11 +151,13 @@ final class Verify
             'verified' => $verified,
             'task_id' => $proof['task_id'],
             'key_id' => $keyData['key_id'] ?? null,
-            'algorithm' => 'Ed25519',
+            'algorithm' => $algorithm,
             'fields_signed' => $fields,
             'trustless' => true,
             'message' => $verified
-                ? 'Signature mathematically verified. This proof was signed by ForceDream and has not been altered.'
+                ? ($isBatched
+                    ? 'Signature mathematically verified against a real, independently-reconstructed Merkle root. Signed by ForceDream, unaltered.'
+                    : 'Signature mathematically verified. This proof was signed by ForceDream and has not been altered.')
                 : 'Signature verification FAILED. The proof was altered or not signed by ForceDream.',
             'note' => 'Verified client-side via public-key cryptography. ForceDream was not asked whether the proof is valid.',
         ];

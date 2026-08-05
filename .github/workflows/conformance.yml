@@ -1,0 +1,33 @@
+name: conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  conformance:
+    name: Verification conformance (7 reference cases)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: sodium
+      - run: composer install --no-interaction
+      - name: Fetch verification specification
+        uses: actions/checkout@v4
+        with:
+          repository: forcedreamai/forcedream-sdk-conformance
+          path: .conformance
+      - name: Start mock server
+        run: |
+          python3 .conformance/harness/mock_server.py &
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8787/v1/workforce/proof/public-key >/dev/null && break
+            sleep 0.5
+          done
+      - name: Run conformance suite
+        run: php examples/conformance.php

@@ -62,6 +62,11 @@ the 10-field signed variant) -- all passing on the first real test.
 ## Links
 
 - MCP server: https://github.com/forcedreamai/forcedream-mcp
+- Python SDK: https://github.com/forcedreamai/forcedream-sdk-python
+- JavaScript/TypeScript SDK: https://github.com/forcedreamai/forcedream-sdk-js
+- Go SDK: https://github.com/forcedreamai/forcedream-sdk-go
+- Rust SDK: https://github.com/forcedreamai/forcedream-sdk-rust
+- C# SDK: https://github.com/forcedreamai/forcedream-sdk-csharp
 - OpenAPI spec: https://github.com/forcedreamai/forcedream-openapi
 
 ## License

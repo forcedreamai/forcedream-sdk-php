@@ -6,15 +6,19 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use ForceDream\ForceDream;
 
-$cases = [
-    'conf_a_real_batched' => true,
-    'conf_b_real_batched' => true,
-    'conf_c_bad_signature' => false,
-    'conf_d_bad_payload' => false,
-    'conf_e_bad_algorithm' => false,
-    'conf_f_siblings_wrong_root' => false,
-    'conf_g_missing_root' => false,
-];
+// Cases come from the server, never a literal here. A hardcoded list is a snapshot
+// that silently drifts: when the contract gained conf_h and conf_i, every hardcoded
+// harness kept running seven cases and reporting green.
+$raw = @file_get_contents('http://127.0.0.1:8787/conformance/cases');
+if ($raw === false) {
+    fwrite(STDERR, "Could not fetch the contract. Start harness/mock_server.py first.\n");
+    exit(2);
+}
+$cases = array_map(fn($m) => $m['expected'], json_decode($raw, true) ?: []);
+if (count($cases) === 0) {
+    fwrite(STDERR, "INCONCLUSIVE: the server returned no cases.\n");
+    exit(2);
+}
 
 $fd = new ForceDream(null, 'http://127.0.0.1:8787');
 $passed = 0; $failed = 0; $errored = 0;

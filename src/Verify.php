@@ -40,7 +40,20 @@ final class Verify
         if ($hasExt) {
             $base['external_cost_hash'] = (string) $proof['external_cost_hash'];
             $base['retrieved_count'] = (float) ($proof['retrieved_count'] ?? 0);
-            return ['signable' => $base, 'fields' => 10];
+            // Model binding: the server records which provider and model actually served
+            // the execution and binds them into the signed payload. Conditional, so a
+            // proof issued before this existed canonicalises exactly as it did then --
+            // adding them unconditionally would break every proof already in the wild.
+            $n = 10;
+            if (!empty($proof['inference_provider'])) {
+                $base['inference_provider'] = (string) $proof['inference_provider'];
+                $n++;
+            }
+            if (!empty($proof['inference_model'])) {
+                $base['inference_model'] = (string) $proof['inference_model'];
+                $n++;
+            }
+            return ['signable' => $base, 'fields' => $n];
         }
         return ['signable' => $base, 'fields' => 8];
     }
